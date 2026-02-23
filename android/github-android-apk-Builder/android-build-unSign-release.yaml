@@ -1,0 +1,90 @@
+name: Android Auto Release
+
+on:
+  push:
+    branches:
+      - main
+    # Only run when commit message includes [release]
+    # For full automation you can remove the "if" filter
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write  # Needed to create tags & release
+
+    steps:
+      # 1️⃣ Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Setup Java
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      # 3️⃣ Setup Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # 4️⃣ Grant Gradle permission
+      - name: Grant execute permission
+        run: chmod +x gradlew
+
+      # 5️⃣ Clean project
+      - name: Clean project
+        run: ./gradlew clean
+
+      # 6️⃣ Build Release APK & AAB
+      - name: Build Release APK & AAB
+        run: ./gradlew assembleRelease bundleRelease
+
+      # 7️⃣ Read version from build.gradle & create version tag
+      - name: Get Version from build.gradle
+        id: version
+        run: |
+          VERSION_NAME=$(grep 'versionName' app/build.gradle | awk -F'"' '{print $2}')
+          VERSION_CODE=$(grep 'versionCode' app/build.gradle | awk '{print $2}')
+          NEW_VERSION="v${VERSION_NAME}.${GITHUB_RUN_NUMBER}"
+          echo "VERSION=${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "VERSION_CODE=${VERSION_CODE}" >> $GITHUB_OUTPUT
+          echo "New version tag: $NEW_VERSION"
+
+      # 8️⃣ Create Git Tag
+      - name: Create Git Tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ steps.version.outputs.VERSION }}
+          git push origin ${{ steps.version.outputs.VERSION }}
+
+      # 9️⃣ Create GitHub Release
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: Release ${{ steps.version.outputs.VERSION }}
+          body: |
+            Automated Android release build
+            Version: ${{ steps.version.outputs.VERSION }}
+            Build number: ${{ github.run_number }}
+          files: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 🔟 Upload artifacts (optional for CI storage)
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build
+          path: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
