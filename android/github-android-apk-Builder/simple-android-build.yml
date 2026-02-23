@@ -1,0 +1,72 @@
+name: Android CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build Android App
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout source code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Setup Java
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      # Setup Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # Grant Gradle permission
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # Clean project
+      - name: Clean project
+        run: ./gradlew clean
+
+      # Build Release APK
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
+
+      # Build Release AAB (Play Store)
+      - name: Build Release Bundle
+        run: ./gradlew bundleRelease
+
+      # Upload APK artifact
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: app/build/outputs/apk/release/*.apk
+
+      # Upload AAB artifact
+      - name: Upload Release AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-aab
+          path: app/build/outputs/bundle/release/*.aab
+
+      # Upload APK to GitHub Release (only on tag push)
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: app/build/outputs/apk/release/*.apk
+          tag: ${{ github.ref_name }}
+          overwrite: true
+          body: "Android release build"
