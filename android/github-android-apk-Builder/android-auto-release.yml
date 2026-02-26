@@ -1,0 +1,91 @@
+name: Android Auto Release
+
+on:
+  push:
+    branches:
+      - main
+    # Only run when commit message includes [release]
+    # This ensures releases happen intentionally
+    # If you want full automation, you can remove this filter
+    # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#onpushpull_requestpaths
+    # Using workflow_run or workflow_dispatch is optional for manual triggers
+    # For this pro version, we focus on push with [release] in commit
+    # You can adjust the pattern as needed
+    # Example: '.*\[release\].*' regex
+    # (GitHub Actions uses `if` condition for commit message filter)
+    
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write  # Needed to create tags & releases
+
+    steps:
+      # 1️⃣ Checkout the code
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Setup JDK 17
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      # 3️⃣ Setup Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # 4️⃣ Make Gradle executable
+      - name: Make Gradle Executable
+        run: chmod +x gradlew
+
+      # 5️⃣ Build Release APK & AAB
+      - name: Build Release APK & AAB
+        run: ./gradlew assembleRelease bundleRelease
+
+      # 6️⃣ Extract version info and generate version tag
+      - name: Get Version from build.gradle
+        id: version
+        run: |
+          VERSION_NAME=$(grep -E 'versionName\s+' app/build.gradle | awk -F'"' '{print $2}')
+          VERSION_CODE=$(grep -E 'versionCode\s+' app/build.gradle | awk '{print $2}')
+          NEW_VERSION="v${VERSION_NAME}.${GITHUB_RUN_NUMBER}"
+          echo "VERSION=${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "VERSION_CODE=${VERSION_CODE}" >> $GITHUB_OUTPUT
+          echo "----------------------------------------"
+          echo "📦 Version Info"
+          echo "Version Name: $VERSION_NAME"
+          echo "Version Code: $VERSION_CODE"
+          echo "GitHub Run Number: $GITHUB_RUN_NUMBER"
+          echo "Generated Version Tag: $NEW_VERSION"
+          echo "----------------------------------------"
+
+      # 7️⃣ Tag the commit
+      - name: Create Git Tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ steps.version.outputs.VERSION }}
+          git push origin ${{ steps.version.outputs.VERSION }}
+
+      # 8️⃣ Publish GitHub Release
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: Release ${{ steps.version.outputs.VERSION }}
+          body: |
+            🚀 Automated Android production release
+            - Version: ${{ steps.version.outputs.VERSION }}
+            - Build Number: ${{ github.run_number }}
+          files: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
