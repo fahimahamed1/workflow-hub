@@ -1,187 +1,135 @@
 # 🚀 Android GitHub Actions Workflows
 
-This repository contains three different Android CI/CD workflows designed for different use cases:
+This repository includes **four Android CI/CD workflows** designed for different stages of development — from simple CI builds to fully automated production releases.
 
-- ✅ Simple CI build
-- ✅ Automated unsigned release
-- ✅ Fully automated signed production release with semantic versioning
+Choose the one that fits your workflow.
 
 ---
 
 # 📦 Workflow Overview
 
-| Workflow File | Purpose | Signing | Versioning | GitHub Release | Recommended Use |
-|---------------|----------|----------|------------|----------------|-----------------|
-| `simple-android-build.yml` | Basic CI build | ❌ No | ❌ No | Only on tag | Development / Testing |
-| `android-build-unSign-release.yaml` | Automated unsigned release | ❌ No | From build.gradle | ✅ Yes | Internal QA |
-| `android-build-autoSign-release-pro.yml` | Production-grade automated release | ✅ Yes (Temp keystore) | ✅ Auto semantic | ✅ Yes | Production / Beta |
+| Workflow File | Purpose | Signing | Versioning | Release | Best For |
+|---------------|---------|---------|------------|---------|----------|
+| `simple-android-build.yml` | Basic CI build | ❌ | ❌ | On tag only | Development |
+| `android-build-unSign-release.yaml` | Unsigned auto release | ❌ | From `build.gradle` | ✅ | QA / Internal |
+| `android-build-autoSign-release-pro.yml` | Full production pipeline | ✅ | Auto semantic | ✅ | Production |
+| `android-auto-release.yml` | Commit-controlled release | ❌ | From `build.gradle` | ✅ | Controlled production |
 
 ---
 
 # 1️⃣ simple-android-build.yml
 
-## 📌 Purpose
-A lightweight CI workflow that builds Release APK and AAB files.
+### 📌 What it does
+- Builds Release APK & AAB  
+- Uploads build artifacts  
+- Creates release only when pushing a tag  
 
-## 🕒 Triggers
+### 🕒 Triggers
 - Push to `main`
 - Tag push (`v*`)
-- Manual trigger (`workflow_dispatch`)
+- Manual trigger
 
-## 🔧 What It Does
-1. Checkout repository
-2. Setup JDK 17
-3. Setup Android SDK
-4. Clean project
-5. Build:
-   - Release APK
-   - Release AAB
-6. Upload artifacts
-7. If triggered by tag → publish GitHub Release (APK only)
+### 🎯 Best for
+- Pull request validation  
+- CI builds  
+- Manual tagged releases  
 
-## 🎯 Best For
-- Pull request validation
-- Continuous Integration builds
-- Manual tagged releases
-
-## 🚫 Limitations
-- No automatic version increment
-- No automatic tag creation
-- No signing configuration
+### 🚫 Limitations
+- No version bump  
+- No automatic tagging  
+- No signing  
 
 ---
 
 # 2️⃣ android-build-unSign-release.yaml
 
-## 📌 Purpose
-Automates building and creating a GitHub release without signing.
+### 📌 What it does
+- Builds Release APK & AAB  
+- Reads `versionName` & `versionCode` from `build.gradle`  
+- Creates tag:  
+  ```
+  v<versionName>.<github_run_number>
+  ```
+- Publishes GitHub Release  
+- Uploads APK & AAB  
 
-## 🕒 Triggers
+### 🕒 Triggers
 - Push to `main`
-- Manual trigger
+- Manual trigger  
 
-## 🔧 What It Does
-1. Builds Release APK & AAB
-2. Reads:
-   - `versionName`
-   - `versionCode`
-   from `app/build.gradle`
-3. Creates version tag:
-   ```
-   v<versionName>.<github_run_number>
-   ```
-4. Pushes Git tag
-5. Creates GitHub Release
-6. Uploads:
-   - APK
-   - AAB
-7. Stores build artifacts in Actions
+### 🎯 Best for
+- QA builds  
+- Internal distribution  
+- Projects using Google Play App Signing  
 
-## 🎯 Best For
-- Internal distribution
-- QA builds
-- Projects using external signing (Google Play App Signing)
-
-## 🚫 Limitations
-- No automatic semantic version bump
-- Uses version defined in build.gradle
-- No signing (unsigned output)
+### 🚫 Limitations
+- No semantic version bump  
+- Unsigned output  
 
 ---
 
-# 3️⃣ android-build-autoSign-release-pro.yml (Production Grade)
+# 3️⃣ android-build-autoSign-release-pro.yml (Production)
 
-## 📌 Purpose
-Fully automated CI/CD pipeline with:
-- Automatic semantic versioning
-- Auto versionCode increment
-- Temporary keystore generation
-- Signed APK & AAB
-- Git tag creation
-- GitHub release creation
-- Automatic release notes generation
+### 📌 What it does
+- Automatically increments semantic version  
+- Increments `versionCode`  
+- Generates temporary keystore  
+- Builds signed APK & AAB  
+- Creates tag & GitHub Release  
+- Generates release notes from commits  
 
-## 🕒 Triggers
-- Push to:
-  - `main`
-  - `beta`
-- Manual trigger
+### 🕒 Triggers
+- Push to `main`
+- Push to `beta`
+- Manual trigger  
 
----
+### 🧠 Versioning Logic
+- Reads latest tag (e.g., `v1.2.3`)  
+- Auto increments patch → `v1.2.4`  
+- On `beta` branch → `v1.2.4-beta`
 
-## 🧠 Versioning Logic
-
-1. Fetch latest git tag (example: `v1.2.3`)
-2. Increment PATCH version automatically
-3. If branch is `beta`:
-   ```
-   v1.2.4-beta
-   ```
-4. If branch is `main`:
-   ```
-   v1.2.4
-   ```
+### 🎯 Best for
+- Full production automation  
+- Beta pipelines  
+- Teams wanting zero manual release steps  
 
 ---
 
-## 🔐 Signing Strategy
+# 4️⃣ android-auto-release.yml (Commit-Based Release)
 
-- Generates temporary keystore inside CI
-- Random passwords generated automatically
-- Used only for build process
-- Deleted after workflow completes
+### 📌 What it does
+- Builds Release APK & AAB  
+- Reads version from `build.gradle`  
+- Creates tag using:
+  ```
+  v<versionName>.<github_run_number>
+  ```
+- Publishes GitHub Release  
+- Uploads APK & AAB  
 
-⚠️ For Google Play production, enable Play App Signing or replace with real keystore secrets.
+### 🕒 Triggers
+- Push to `main`
+- Manual trigger  
 
----
-
-## 📝 Release Notes
-
-Automatically generated using:
+To trigger intentionally, include:
 
 ```
-git log previous_tag..HEAD
+[release]
 ```
 
-Included in GitHub Release body.
-
----
-
-## 🔧 Automatically Updates
-
-- `versionCode` → incremented by 1
-- `versionName` → updated to new semantic version
-
----
-
-## 🎯 Best For
-
-- Production automation
-- Beta releases
-- Zero manual release process
-- Teams wanting full CI/CD pipeline
-
----
-
-# 🏗 Recommended Usage Strategy
-
-### 🔹 Development Phase
-Use:
+Example:
 ```
-simple-android-build.yml
+git commit -m "Prepare production build [release]"
 ```
 
-### 🔹 Internal Testing / QA
-Use:
-```
-android-build-unSign-release.yaml
-```
+### 🎯 Best for
+- Controlled production releases  
+- Teams who want intentional release commits  
+- Simple, stable automation  
 
-### 🔹 Production / Beta Deployment
-Use:
-```
-android-build-autoSign-release-pro.yml
-```
+### 🚫 Limitations
+- No semantic version bump  
+- Unsigned build  
 
 ---
 
@@ -194,23 +142,20 @@ Repository Settings → Actions → Workflow permissions
 ```
 
 Enable:
-- ✅ Read and write permissions
-- ✅ Allow GitHub Actions to create and push tags
+- ✅ Read and write permissions  
+- ✅ Allow Actions to create and push tags  
 
 ---
 
-# 📌 Required Secrets
+# 🔑 Required Secrets
 
-Currently only required:
-
+Default:
 ```
 GITHUB_TOKEN
 ```
+(Provided automatically by GitHub)
 
-(Automatically provided by GitHub)
-
-If switching to real keystore signing, add:
-
+For real signing (optional):
 - `KEYSTORE_BASE64`
 - `KEYSTORE_PASSWORD`
 - `KEY_ALIAS`
@@ -220,37 +165,25 @@ If switching to real keystore signing, add:
 
 # 📊 Feature Comparison
 
-| Feature | Simple CI | Unsigned Release | Auto Signed Pro |
-|----------|-----------|------------------|------------------|
-| Builds APK | ✅ | ✅ | ✅ |
-| Builds AAB | ✅ | ✅ | ✅ |
-| Auto Tag | ❌ | ✅ | ✅ |
-| Auto Version Bump | ❌ | ❌ | ✅ |
-| Signed | ❌ | ❌ | ✅ |
-| Auto Release Notes | ❌ | ❌ | ✅ |
-| Production Ready | ❌ | ⚠️ | ✅ |
+| Feature | Simple CI | Unsigned | Auto Signed Pro | Commit-Based |
+|----------|-----------|----------|-----------------|--------------|
+| Builds APK | ✅ | ✅ | ✅ | ✅ |
+| Builds AAB | ✅ | ✅ | ✅ | ✅ |
+| Auto Tag | ❌ | ✅ | ✅ | ✅ |
+| Auto Version Bump | ❌ | ❌ | ✅ | ❌ |
+| Signed | ❌ | ❌ | ✅ | ❌ |
+| Auto Release Notes | ❌ | ❌ | ✅ | ❌ |
+| Production Ready | ❌ | ⚠️ | ✅ | ✅ |
 
 ---
 
-# 🧩 Possible Improvements
-
-You can extend these workflows to:
-
-- Upload to Google Play (Play Developer API)
-- Upload to Firebase App Distribution
-- Add Slack/Discord notifications
-- Run unit tests & lint before release
-- Add code coverage reporting
-- Add build caching optimizations
-
----
-
-# 📌 Summary
+# 📌 Final Summary
 
 You now have:
 
-- 🟢 Simple CI workflow
-- 🟡 Automated unsigned release workflow
-- 🔵 Fully automated signed production release workflow
+- 🟢 Simple CI build  
+- 🟡 Automated unsigned release  
+- 🔵 Fully automated signed production pipeline  
+- 🟣 Controlled commit-based release  
 
-Choose the one that fits your development stage and deployment strategy.
+Start simple during development, move to unsigned for QA, and use the Pro workflow for full production automation.
